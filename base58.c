@@ -29,8 +29,10 @@
 #include "ripemd160.h"
 #include "memzero.h"
 
+#define B58_MAP_SIZE 128
+
 const char b58digits_ordered[] = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-const int8_t b58digits_map[] = {
+const int8_t b58digits_map[B58_MAP_SIZE] = {
 	-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
 	-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
 	-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
@@ -41,12 +43,33 @@ const int8_t b58digits_map[] = {
 	47,48,49,50,51,52,53,54,55,56,57,-1,-1,-1,-1,-1,
 };
 
-bool b58tobin(void *bin, size_t *binszp, const char *b58)
+bool b58tobin(void *bin, size_t *binszp, const char *b58, const char *digits)
 {
 	size_t binsz = *binszp;
 
 	if (binsz == 0) {
 		return false;
+	}
+
+	int8_t *digits_map;
+	if (!digits || digits == b58digits_ordered) {
+		digits = b58digits_ordered;
+		digits_map = b58digits_map;
+	} else {
+		static const char *digits_cached = NULL;
+		static int8_t cache[B58_MAP_SIZE];
+		if (digits_cached != digits) {
+			for (int i = 0; i < B58_MAP_SIZE; i++) {
+				cache[i] = -1;
+			}
+			for (int i = 0; digits[i]; i++) {
+				if (B58_MAP_SIZE <= digits[i])
+					return false;
+				cache[digits[i]] = i;
+			}
+			digits_cached = digits;
+			digits_map = cache;
+		}
 	}
 
 	const unsigned char *b58u = (const unsigned char*)b58;
@@ -154,12 +177,15 @@ int b58check(const void *bin, size_t binsz, HasherType hasher_type, const char *
 	return binc[0];
 }
 
-bool b58enc(char *b58, size_t *b58sz, const void *data, size_t binsz)
+bool b58enc(char *b58, size_t *b58sz, const void *data, size_t binsz, const char *digits)
 {
 	const uint8_t *bin = data;
 	int carry;
 	ssize_t i, j, high, zcount = 0;
 	size_t size;
+
+	if (!digits)
+		digits = b58digits_ordered;
 
 	while (zcount < (ssize_t)binsz && !bin[zcount])
 		++zcount;
@@ -189,14 +215,14 @@ bool b58enc(char *b58, size_t *b58sz, const void *data, size_t binsz)
 	if (zcount)
 		memset(b58, '1', zcount);
 	for (i = zcount; j < (ssize_t)size; ++i, ++j)
-		b58[i] = b58digits_ordered[buf[j]];
+		b58[i] = digits[buf[j]];
 	b58[i] = '\0';
 	*b58sz = i + 1;
 
 	return true;
 }
 
-int base58_encode_check(const uint8_t *data, int datalen, HasherType hasher_type, char *str, int strsize)
+int base58_encode_check(const uint8_t *data, int datalen, HasherType hasher_type, char *str, int strsize, const char *digits)
 {
 	if (datalen > 128) {
 		return 0;
@@ -206,19 +232,19 @@ int base58_encode_check(const uint8_t *data, int datalen, HasherType hasher_type
 	memcpy(buf, data, datalen);
 	hasher_Raw(hasher_type, data, datalen, hash);
 	size_t res = strsize;
-	bool success = b58enc(str, &res, buf, datalen + 4);
+	bool success = b58enc(str, &res, buf, datalen + 4, digits);
 	memzero(buf, sizeof(buf));
 	return success ? res : 0;
 }
 
-int base58_decode_check(const char *str, HasherType hasher_type, uint8_t *data, int datalen)
+int base58_decode_check(const char *str, HasherType hasher_type, uint8_t *data, int datalen, const char *digits)
 {
 	if (datalen > 128) {
 		return 0;
 	}
 	uint8_t d[datalen + 4];
 	size_t res = datalen + 4;
-	if (b58tobin(d, &res, str) != true) {
+	if (b58tobin(d, &res, str, digits) != true) {
 		return 0;
 	}
 	uint8_t *nd = d + datalen + 4 - res;
@@ -250,7 +276,7 @@ int b58gphcheck(const void *bin, size_t binsz, const char *base58str)
 	return binc[0];
 }
 
-int base58gph_encode_check(const uint8_t *data, int datalen, char *str, int strsize)
+int base58gph_encode_check(const uint8_t *data, int datalen, char *str, int strsize, const char *digits)
 {
 	if (datalen > 128) {
 		return 0;
@@ -260,19 +286,19 @@ int base58gph_encode_check(const uint8_t *data, int datalen, char *str, int strs
 	memcpy(buf, data, datalen);
 	ripemd160(data, datalen, hash);  // No double SHA256, but a single RIPEMD160
 	size_t res = strsize;
-	bool success = b58enc(str, &res, buf, datalen + 4);
+	bool success = b58enc(str, &res, buf, datalen + 4, digits);
 	memzero(buf, sizeof(buf));
 	return success ? res : 0;
 }
 
-int base58gph_decode_check(const char *str, uint8_t *data, int datalen)
+int base58gph_decode_check(const char *str, uint8_t *data, int datalen, const char *digits)
 {
 	if (datalen > 128) {
 		return 0;
 	}
 	uint8_t d[datalen + 4];
 	size_t res = datalen + 4;
-	if (b58tobin(d, &res, str) != true) {
+	if (b58tobin(d, &res, str, digits) != true) {
 		return 0;
 	}
 	uint8_t *nd = d + datalen + 4 - res;

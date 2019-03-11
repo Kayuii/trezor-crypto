@@ -892,7 +892,7 @@ void ecdsa_get_address(const uint8_t *pub_key, uint32_t version, HasherType hash
 	uint8_t raw[MAX_ADDR_RAW_SIZE];
 	size_t prefix_len = address_prefix_bytes_len(version);
 	ecdsa_get_address_raw(pub_key, version, hasher_pubkey, raw);
-	base58_encode_check(raw, 20 + prefix_len, hasher_base58, addr, addrsize);
+	base58_encode_check(raw, 20 + prefix_len, hasher_base58, addr, addrsize, NULL);
 	// not as important to clear this one, but we might as well
 	memzero(raw, sizeof(raw));
 }
@@ -913,7 +913,7 @@ void ecdsa_get_address_segwit_p2sh(const uint8_t *pub_key, uint32_t version, Has
 	uint8_t raw[MAX_ADDR_RAW_SIZE];
 	size_t prefix_len = address_prefix_bytes_len(version);
 	ecdsa_get_address_segwit_p2sh_raw(pub_key, version, hasher_pubkey, raw);
-	base58_encode_check(raw, prefix_len + 20, hasher_base58, addr, addrsize);
+	base58_encode_check(raw, prefix_len + 20, hasher_base58, addr, addrsize, NULL);
 	memzero(raw, sizeof(raw));
 }
 
@@ -924,7 +924,7 @@ void ecdsa_get_wif(const uint8_t *priv_key, uint32_t version, HasherType hasher_
 	address_write_prefix_bytes(version, wif_raw);
 	memcpy(wif_raw + prefix_len, priv_key, 32);
 	wif_raw[prefix_len + 32] = 0x01;
-	base58_encode_check(wif_raw, prefix_len + 32 + 1, hasher_base58, wif, wifsize);
+	base58_encode_check(wif_raw, prefix_len + 32 + 1, hasher_base58, wif, wifsize, NULL);
 	// private keys running around our stack can cause trouble
 	memzero(wif_raw, sizeof(wif_raw));
 }
@@ -933,7 +933,7 @@ int ecdsa_address_decode(const char *addr, uint32_t version, HasherType hasher_b
 {
 	if (!addr) return 0;
 	int prefix_len = address_prefix_bytes_len(version);
-	return base58_decode_check(addr, hasher_base58, out, 20 + prefix_len) == 20 + prefix_len
+	return base58_decode_check(addr, hasher_base58, out, 20 + prefix_len, NULL) == 20 + prefix_len
 		&& address_check_prefix(out, version);
 }
 
