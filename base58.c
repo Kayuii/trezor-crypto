@@ -51,7 +51,7 @@ bool b58tobin(void *bin, size_t *binszp, const char *b58, const char *digits)
 		return false;
 	}
 
-	int8_t *digits_map;
+	const int8_t *digits_map;
 	if (!digits || digits == b58digits_ordered) {
 		digits = b58digits_ordered;
 		digits_map = b58digits_map;
@@ -63,7 +63,7 @@ bool b58tobin(void *bin, size_t *binszp, const char *b58, const char *digits)
 				cache[i] = -1;
 			}
 			for (int i = 0; digits[i]; i++) {
-				if (B58_MAP_SIZE <= digits[i])
+				if (B58_MAP_SIZE <= (uint8_t)digits[i])
 					return false;
 				cache[digits[i]] = i;
 			}
